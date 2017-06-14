@@ -63,9 +63,10 @@ impl Ksuid {
         rand::random()
     }
 
-    /// Parse a `Ksuid` from a base62-encoded string.
+    /// Parse a `Ksuid` from a 27-byte, base62-encoded string.
     pub fn from_base62(s: &str) -> io::Result<Self> {
-        if s.len() != BASE62_LEN {
+        let bytes = s.as_bytes();
+        if bytes.len() != BASE62_LEN || bytes > MAX_BASE62_KSUID {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid id"));
         }
 
@@ -79,7 +80,7 @@ impl Ksuid {
 
         let mut ret = Ksuid(EMPTY);
         let mut scratch = *s;
-        base62::decode_raw(scratch.as_mut(), ret.0.as_mut());
+        base62::decode_raw(scratch.as_mut(), ret.0.as_mut())?;
         Ok(ret)
     }
 
@@ -129,7 +130,7 @@ impl Ksuid {
     pub fn to_base62(&self) -> String {
         let mut scratch = self.0;
         let mut out = vec![0; 27];
-        base62::encode_raw(scratch.as_mut(), out.as_mut()).unwrap();
+        base62::encode_raw(scratch.as_mut(), out.as_mut());
         unsafe { String::from_utf8_unchecked(out) }
     }
 
@@ -192,5 +193,30 @@ impl Ksuid {
 impl Rand for Ksuid {
     fn rand<R: Rng>(rng: &mut R) -> Self {
         Self::with_payload(rng.gen())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+    use super::*;
+
+    #[bench]
+    fn bench_from_base62(b: &mut test::Bencher) {
+        let encoded = "0o5Fs0EELR0fUjHjbCnEtdUwQe3";
+
+        b.iter(|| {
+            Ksuid::from_base62(encoded)
+        })
+    }
+
+    #[bench]
+    fn bench_to_base62(b: &mut test::Bencher) {
+        let hex = "05A95E21D7B6FE8CD7CFF211704D8E7B9421210B";
+        let ksuid = Ksuid::from_hex(hex).unwrap();
+
+        b.iter(|| {
+            ksuid.to_base62()
+        })
     }
 }

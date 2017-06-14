@@ -27,30 +27,26 @@ fn b62_to_bin(c: u8) -> i8 {
 }
 
 /// An upper-bound on the length of the result of a generic base conversion.
-fn upper_bound(len: usize, in_base: usize, out_base: usize) -> usize {
+pub fn conversion_len_bound(len: usize, in_base: usize, out_base: usize) -> usize {
     let out = len as f64 * ((in_base as f64).ln() / (out_base as f64).ln());
     out as usize + 1
 }
 
-/// An upper bound on the length of the base62-encoded version of a byte string.
-fn encoded_upper_bound(len: usize) -> usize {
-    // log(256) / log(62) = 1.343590...
-    1 + (len * 13446) / 10000
-}
-
-/// An upper bound on the length of the decoded version of a base62-encoded byte string.
-fn decoded_upper_bound(len: usize) -> usize {
-    // log(62) / log(256) = 0.74427453...
-    1 + (len * 7443) / 10000
-}
-
-/// Change the base of a byte string.
+/// Change the base of a byte string representing a big-endian encoded arbitrary-size unsigned
+/// integer.
+///
+/// # Notes
 ///
 /// This clobbers `num`.
+///
+/// `out `should be zeroed prior to being passed to this function, as this function will leave
+/// bytes in the output buffer corresponding to any leading zeros in the resulting number
+/// unchanged instead of explicitly overwriting them.
 pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) {
     debug_assert!(out.iter().all(|&b| b == 0));
     let mut k = out.len();
 
+    // Use grade-school long division, storing the intermediate result back into `num` as we go.
     while num.len() > 0 {
         let mut rem = 0;
         let mut i = 0;
@@ -70,18 +66,31 @@ pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base:
         out[k] = rem as u8;
         num.resize_to(i);
     }
+
+    // Explicitly clearing leading zeros significantly hurts performance.
+    /*
+    while k > 0 {
+        k -= 1;
+        out[k] = 0;
+    }
+    */
 }
 
-pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) -> io::Result<()> {
+/// Base62-encode `raw`, placing the result into `out`.
+///
+/// `raw` will be clobbered.
+pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) {
     change_base(raw, out, 256, 62);
-    debug_assert!(out.iter().all(|&b| b < 62));
     for b in out.iter_mut() {
         *b = CHAR_MAP[*b as usize];
     }
-
-    Ok(())
 }
 
+
+/// Base62-decode `encoded`, placing the result into `out`. If `encoded` contains any characters
+/// which are not matching `/[0-9A-Za-z]/`, an error will be returned.
+///
+/// `encoded` will be clobbered.
 pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
     // Map each ASCII-encoded base-62 character to its binary value.
     for c in encoded.iter_mut() {
@@ -120,17 +129,6 @@ mod tests {
     }
 
     #[test]
-    fn test_bounds() {
-        for i in 0..10000 {
-            let (approx, exact) = (decoded_upper_bound(i), upper_bound(i, 62, 256));
-            assert!(approx >= exact, "dec: {} < {} [i={}]", approx, exact, i);
-
-            let (approx, exact) = (encoded_upper_bound(i), upper_bound(i, 256, 62));
-            assert!(approx >= exact, "enc: {} < {} [i={}]", approx, exact, i);
-        }
-    }
-
-    #[test]
     fn test_change_base() {
         let suite = vec![
             (256, 62, vec![255u8, 254, 253, 252]),
@@ -156,17 +154,19 @@ mod tests {
         b.iter(|| {
             test::black_box(&mut out);
             let mut bytes = [12, 104, 48, 1, 245, 234, 245, 14, 194];
-            change_base(bytes.as_mut(), out.as_mut(), 256, 62)
+            change_base(bytes.as_mut(), out.as_mut(), 256, 62);
         })
     }
 
     #[bench]
     fn bench_encode(b: &mut test::Bencher) {
-        let mut out = vec![0; 27];
+        // This KSUID has a leading zero. Therefore we use a 26-byte buffer so we don't have to
+        // zero the output after every run.
+        let mut out = vec![0; 26];
         let hex = data_encoding::hex::decode(b"05A95E21D7B6FE8CD7CFF211704D8E7B9421210B").unwrap();
         b.iter(|| {
             test::black_box(&mut out);
-            change_base(hex.clone().as_mut(), out.as_mut(), 256, 62)
+            encode_raw(hex.clone().as_mut(), out.as_mut());
         })
     }
 
@@ -177,7 +177,7 @@ mod tests {
 
         b.iter(|| {
             test::black_box(&mut out);
-            decode_raw(encoded.clone().as_mut(), out.as_mut())
+            let _ = decode_raw(encoded.clone().as_mut(), out.as_mut());
         })
     }
 }
