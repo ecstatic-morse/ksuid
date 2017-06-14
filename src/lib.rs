@@ -79,7 +79,7 @@ impl Ksuid {
 
         let mut ret = Ksuid(EMPTY);
         let mut scratch = *s;
-        base62::decode_raw(scratch.as_mut(), ret.0.as_mut())?;
+        base62::decode_raw(scratch.as_mut(), ret.0.as_mut());
         Ok(ret)
     }
 

@@ -47,9 +47,9 @@ fn decoded_upper_bound(len: usize) -> usize {
 /// Change the base of a byte string.
 ///
 /// This clobbers `num`.
-pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) -> io::Result<()> {
+pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) {
     debug_assert!(out.iter().all(|&b| b == 0));
-    let mut oi = out.iter_mut().rev();
+    let mut k = out.len();
 
     while num.len() > 0 {
         let mut rem = 0;
@@ -66,16 +66,14 @@ pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base:
             }
         }
 
-        let place = oi.next().ok_or(io::Error::new(io::ErrorKind::WriteZero, "Output buffer not long enough"))?;
-        *place = rem as u8;
+        k -= 1;
+        out[k] = rem as u8;
         num.resize_to(i);
     }
-
-    Ok(())
 }
 
 pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) -> io::Result<()> {
-    change_base(raw, out, 256, 62)?;
+    change_base(raw, out, 256, 62);
     debug_assert!(out.iter().all(|&b| b < 62));
     for b in out.iter_mut() {
         *b = CHAR_MAP[*b as usize];
@@ -99,7 +97,8 @@ pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
         *c = b as u8;
     }
 
-    change_base(encoded, out, 62, 256)
+    change_base(encoded, out, 62, 256);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -142,10 +141,10 @@ mod tests {
             let mut intermediate = vec![0; 20];
             let mut output = vec![0; 20];
 
-            change_base(input.clone().as_mut_slice(), intermediate.as_mut(), in_base, out_base).unwrap();
+            change_base(input.clone().as_mut_slice(), intermediate.as_mut(), in_base, out_base);
             println!("intermediate: {}", big_int(intermediate.as_ref()));
 
-            change_base(intermediate.clone().as_mut_slice(), output.as_mut(), out_base, in_base).unwrap();
+            change_base(intermediate.clone().as_mut_slice(), output.as_mut(), out_base, in_base);
             let first_nonzero = output.iter().position(|&b| b != 0).unwrap();
             assert_eq!(input, output.split_at(first_nonzero).1);
         }
@@ -155,6 +154,7 @@ mod tests {
     fn bench_change_base(b: &mut test::Bencher) {
         let mut out = vec![0; 20];
         b.iter(|| {
+            test::black_box(&mut out);
             let mut bytes = [12, 104, 48, 1, 245, 234, 245, 14, 194];
             change_base(bytes.as_mut(), out.as_mut(), 256, 62)
         })
@@ -162,9 +162,10 @@ mod tests {
 
     #[bench]
     fn bench_encode(b: &mut test::Bencher) {
-        let mut out = vec![0; 20];
+        let mut out = vec![0; 27];
         let hex = data_encoding::hex::decode(b"05A95E21D7B6FE8CD7CFF211704D8E7B9421210B").unwrap();
         b.iter(|| {
+            test::black_box(&mut out);
             change_base(hex.clone().as_mut(), out.as_mut(), 256, 62)
         })
     }
@@ -175,6 +176,7 @@ mod tests {
         let encoded = *array_ref!(b"0o5Fs0EELR0fUjHjbCnEtdUwQe3", 0, 27);
 
         b.iter(|| {
+            test::black_box(&mut out);
             decode_raw(encoded.clone().as_mut(), out.as_mut())
         })
     }
