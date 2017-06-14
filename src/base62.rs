@@ -1,3 +1,5 @@
+use std::io;
+
 use resize_slice::ResizeSlice;
 
 const CHAR_MAP: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -43,14 +45,11 @@ fn decoded_upper_bound(len: usize) -> usize {
 }
 
 /// Change the base of a byte string.
-pub fn change_base(mut num: &mut [u8], in_base: usize, out_base: usize) -> Vec<u8> {
-    let out_len = match (in_base, out_base) {
-        (256, 62) => encoded_upper_bound(num.len()),
-        (62, 256) => decoded_upper_bound(num.len()),
-        _         => upper_bound(num.len(), in_base, out_base),
-    };
-
-    let mut out = Vec::with_capacity(out_len);
+///
+/// This clobbers `num`.
+pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) -> io::Result<()> {
+    debug_assert!(out.iter().all(|&b| b == 0));
+    let mut oi = out.iter_mut().rev();
 
     while num.len() > 0 {
         let mut rem = 0;
@@ -67,57 +66,51 @@ pub fn change_base(mut num: &mut [u8], in_base: usize, out_base: usize) -> Vec<u
             }
         }
 
-        out.push(rem as u8);
+        let place = oi.next().ok_or(io::Error::new(io::ErrorKind::WriteZero, "Output buffer not long enough"))?;
+        *place = rem as u8;
         num.resize_to(i);
     }
 
-    out.reverse();
-    out
+    Ok(())
 }
 
-pub fn encode_raw(raw: &mut [u8]) -> String {
-    let mut encoded = change_base(raw, 256, 62);
-    for b in encoded.iter_mut() {
+pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) -> io::Result<()> {
+    change_base(raw, out, 256, 62)?;
+    debug_assert!(out.iter().all(|&b| b < 62));
+    for b in out.iter_mut() {
         *b = CHAR_MAP[*b as usize];
     }
 
-    unsafe { String::from_utf8_unchecked(encoded) }
+    Ok(())
 }
 
-pub fn decode_raw(encoded: &mut [u8]) -> Result<Vec<u8>, char> {
+pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
     // Map each ASCII-encoded base-62 character to its binary value.
     for c in encoded.iter_mut() {
         if *c & 0x80 != 0 {
-            return Err(*c as char);
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Non-ASCII character in input"));
         }
 
         let b = b62_to_bin(*c);
         if b == -1 {
-            return Err(*c as char)
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid base62 character in input"));
         }
 
         *c = b as u8;
     }
 
-    let decoded = change_base(encoded, 62, 256);
-    Ok(decoded)
+    change_base(encoded, out, 62, 256)
 }
 
 #[cfg(test)]
 mod tests {
+    extern crate num;
     extern crate data_encoding;
     extern crate test;
     use super::*;
 
-    fn big_int(bytes: &[u8]) -> u64 {
-        let mut ret = 0;
-        let mut mul = 1;
-        for &b in bytes.iter().rev() {
-            ret += mul * b as u64;
-            mul *= 256
-        }
-
-        ret
+    fn big_int(bytes: &[u8]) -> num::BigUint {
+        num::BigUint::from_bytes_be(bytes)
     }
 
     #[test]
@@ -146,37 +139,43 @@ mod tests {
 
         for (in_base, out_base, input) in suite {
             println!("input: {}", big_int(input.as_ref()));
+            let mut intermediate = vec![0; 20];
+            let mut output = vec![0; 20];
 
-            let intermediate = change_base(input.clone().as_mut_slice(), in_base, out_base);
+            change_base(input.clone().as_mut_slice(), intermediate.as_mut(), in_base, out_base).unwrap();
             println!("intermediate: {}", big_int(intermediate.as_ref()));
 
-            let output = change_base(intermediate.clone().as_mut_slice(), out_base, in_base);
-            assert_eq!(input, output);
+            change_base(intermediate.clone().as_mut_slice(), output.as_mut(), out_base, in_base).unwrap();
+            let first_nonzero = output.iter().position(|&b| b != 0).unwrap();
+            assert_eq!(input, output.split_at(first_nonzero).1);
         }
     }
 
     #[bench]
     fn bench_change_base(b: &mut test::Bencher) {
+        let mut out = vec![0; 20];
         b.iter(|| {
             let mut bytes = [12, 104, 48, 1, 245, 234, 245, 14, 194];
-            change_base(&mut bytes[..], 256, 62)
+            change_base(bytes.as_mut(), out.as_mut(), 256, 62)
         })
     }
 
     #[bench]
     fn bench_encode(b: &mut test::Bencher) {
+        let mut out = vec![0; 20];
         let hex = data_encoding::hex::decode(b"05A95E21D7B6FE8CD7CFF211704D8E7B9421210B").unwrap();
         b.iter(|| {
-            encode_raw(&mut hex.clone()[..])
+            change_base(hex.clone().as_mut(), out.as_mut(), 256, 62)
         })
     }
 
     #[bench]
     fn bench_decode(b: &mut test::Bencher) {
+        let mut out = vec![0; 20];
         let encoded = *array_ref!(b"0o5Fs0EELR0fUjHjbCnEtdUwQe3", 0, 27);
 
         b.iter(|| {
-            decode_raw(&mut encoded.clone()[..])
+            decode_raw(encoded.clone().as_mut(), out.as_mut())
         })
     }
 }

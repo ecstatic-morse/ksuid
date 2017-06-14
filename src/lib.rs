@@ -10,6 +10,7 @@ extern crate time;
 
 mod base62;
 
+use std::io;
 use std::ascii::AsciiExt;
 
 use byteorder::{ByteOrder, BigEndian};
@@ -63,25 +64,22 @@ impl Ksuid {
     }
 
     /// Parse a `Ksuid` from a base62-encoded string.
-    ///
-    /// Once decoded, `s` must be exactly 20 bytes long.
-    pub fn from_base62(s: &str) -> Result<Self, ()> {
+    pub fn from_base62(s: &str) -> io::Result<Self> {
         if s.len() != BASE62_LEN {
-            return Err(())
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid id"));
         }
 
         Self::from_base62_exact(array_ref![s.as_bytes(), 0, BASE62_LEN])
     }
 
-    fn from_base62_exact(s: &[u8; BASE62_LEN]) -> Result<Self, ()> {
+    fn from_base62_exact(s: &[u8; BASE62_LEN]) -> io::Result<Self> {
         if s.as_ref() > MAX_BASE62_KSUID {
-            return Err(())
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid id"));
         }
 
-        let mut scratch = *s;
-        let decoded = base62::decode_raw(scratch.as_mut()).map_err(|_| ())?;
         let mut ret = Ksuid(EMPTY);
-        ret.0.copy_from_slice(decoded.as_ref());
+        let mut scratch = *s;
+        base62::decode_raw(scratch.as_mut(), ret.0.as_mut())?;
         Ok(ret)
     }
 
@@ -89,12 +87,13 @@ impl Ksuid {
     /// `/[0-9A-Fa-f]/`.
     ///
     /// Once decoded, `hex` must be exactly 20 bytes long
-    pub fn from_hex(hex: &str) -> Result<Self, ()> {
+    pub fn from_hex(hex: &str) -> io::Result<Self> {
         if hex.len() != HEX_LEN {
-            return Err(())
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Hex string must be 40 bytes long"));
         }
 
         Self::from_hex_exact(array_ref![hex.as_bytes(), 0, HEX_LEN])
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid hex character in input"))
     }
 
     fn from_hex_exact(hex: &[u8; 40]) -> Result<Self, ()> {
@@ -129,7 +128,9 @@ impl Ksuid {
     /// The base62-encoded version of this `Ksuid`.
     pub fn to_base62(&self) -> String {
         let mut scratch = self.0;
-        base62::encode_raw(scratch.as_mut())
+        let mut out = vec![0; 27];
+        base62::encode_raw(scratch.as_mut(), out.as_mut()).unwrap();
+        unsafe { String::from_utf8_unchecked(out) }
     }
 
     /// The hex-encoded version of this `Ksuid`.

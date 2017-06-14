@@ -3,6 +3,8 @@ extern crate serde_derive;
 extern crate docopt;
 extern crate ksuid;
 
+use std::io;
+
 use ksuid::Ksuid;
 
 const USAGE: &str = "
@@ -43,13 +45,15 @@ fn generate(args: Args) {
 
 fn inspect(args: Args) {
     for uid in args.arg_uids {
-        let ksuid = if uid.len() == 40 {
+        let res = if uid.len() == 40 {
             Ksuid::from_hex(uid.as_ref())
         } else if uid.len() == 27 {
             Ksuid::from_base62(uid.as_ref())
         } else {
-            Err(())
-        }.expect("Invalid KSUID");
+            Err(io::Error::new(io::ErrorKind::InvalidData, ""))
+        };
+
+        let ksuid = res.expect("Invalid KSUID");
 
         println!("
 REPRESENTATION:
