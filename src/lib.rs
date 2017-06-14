@@ -1,8 +1,5 @@
 #![feature(test)]
 
-#[macro_use]
-extern crate arrayref;
-
 extern crate byteorder;
 extern crate rand;
 extern crate resize_slice;
@@ -25,6 +22,14 @@ const BASE62_LEN: usize = 27;
 const HEX_LEN: usize = 40;
 const HEX_DIGITS: &[u8] = b"0123456789ABCDEF";
 const MAX_BASE62_KSUID: &[u8] = b"aWgEPTl1tmebfsQzFP4bxwgy80V";
+
+/// Get the numeric value corresponding to the given hex value.
+fn hex_digit(c: u8) -> io::Result<u8> {
+    HEX_DIGITS.iter()
+        .position(|d| c.eq_ignore_ascii_case(d))
+        .map(|idx| idx as u8)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid hex character in input"))
+}
 
 /// A 20-byte UUID.
 ///
@@ -70,16 +75,9 @@ impl Ksuid {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid id"));
         }
 
-        Self::from_base62_exact(array_ref![s.as_bytes(), 0, BASE62_LEN])
-    }
-
-    fn from_base62_exact(s: &[u8; BASE62_LEN]) -> io::Result<Self> {
-        if s.as_ref() > MAX_BASE62_KSUID {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid id"));
-        }
-
         let mut ret = Ksuid(EMPTY);
-        let mut scratch = *s;
+        let mut scratch = [0; BASE62_LEN];
+        scratch.clone_from_slice(bytes);
         base62::decode_raw(scratch.as_mut(), ret.0.as_mut())?;
         Ok(ret)
     }
@@ -93,16 +91,11 @@ impl Ksuid {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Hex string must be 40 bytes long"));
         }
 
-        Self::from_hex_exact(array_ref![hex.as_bytes(), 0, HEX_LEN])
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid hex character in input"))
-    }
-
-    fn from_hex_exact(hex: &[u8; 40]) -> Result<Self, ()> {
         let mut ret = Ksuid(EMPTY);
 
-        for (pair, place) in hex.chunks(2).zip(ret.0.iter_mut()) {
-            let upper = HEX_DIGITS.iter().position(|d| pair[0].eq_ignore_ascii_case(d)).ok_or(())?;
-            let lower = HEX_DIGITS.iter().position(|d| pair[1].eq_ignore_ascii_case(d)).ok_or(())?;
+        for (pair, place) in hex.as_bytes().chunks(2).zip(ret.0.iter_mut()) {
+            let upper = hex_digit(pair[0])?;
+            let lower = hex_digit(pair[1])?;
             *place = (upper * 16 + lower) as u8;
         }
 
@@ -112,18 +105,14 @@ impl Ksuid {
     /// Parse a `Ksuid` from a raw slice.
     ///
     /// `raw` must be exactly 20 bytes long.
-    pub fn from_bytes(raw: &[u8]) -> Result<Self, ()> {
+    pub fn from_bytes(raw: &[u8]) -> io::Result<Self> {
         if raw.len() != LEN {
-            return Err(())
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Ksuids are 20 bytes long"));
         }
 
-        Ok(Self::from_bytes_exact(array_ref![raw, 0, LEN]))
-    }
-
-    fn from_bytes_exact(hex: &[u8; 20]) -> Self {
         let mut ret = Ksuid(EMPTY);
-        ret.0.copy_from_slice(hex.as_ref());
-        ret
+        ret.0.copy_from_slice(raw);
+        Ok(ret)
     }
 
     /// The Base62-encoded version of this `Ksuid`.
@@ -162,8 +151,8 @@ impl Ksuid {
     }
 
     /// The 16-byte random payload.
-    pub fn payload(&self) -> [u8; 16] {
-        *array_ref![&self.0, 4, 16]
+    pub fn payload(&self) -> &[u8] {
+        &self.0[4..]
     }
 
     /// Set the 16-byte payload.

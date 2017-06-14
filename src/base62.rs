@@ -168,8 +168,9 @@ mod tests {
         // `bytes` now holds the maximum valid Base62 encoded ksuid.
         b.iter(|| {
             test::black_box(&mut out);
-            let mut bytes = *array_ref![bytes.as_slice(), 0, 27];
-            change_base(bytes.as_mut(), out.as_mut(), 62, 256);
+            let mut scratch = [0; 27];
+            scratch.copy_from_slice(bytes.as_ref());
+            change_base(scratch.as_mut(), out.as_mut(), 62, 256);
         })
     }
 }
