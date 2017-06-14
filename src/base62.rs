@@ -15,8 +15,8 @@ const BYTE_MAP: &[i8] = &[
     51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1,
 ];
 
-/// Convert an ascii base-62 character to its binary representation.
-/// Returns `-1` if the  character was not valid base-62 (`[0-9A-Za-z]`).
+/// Convert an ascii Base62 character to its binary representation.
+/// Returns `-1` if the  character was not valid Base62 (`[0-9A-Za-z]`).
 ///
 /// # Panics
 ///
@@ -63,15 +63,15 @@ pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base:
         }
 
         k -= 1;
+        *out.get_mut(k).expect("Input buffer not large enough") = rem as u8;
         out[k] = rem as u8;
         num.resize_to(i);
     }
 
     // Explicitly clearing leading zeros significantly hurts performance.
     /*
-    while k > 0 {
-        k -= 1;
-        out[k] = 0;
+    for i in 0..k {
+        out[i] = 0;
     }
     */
 }
@@ -92,7 +92,7 @@ pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) {
 ///
 /// `encoded` will be clobbered.
 pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
-    // Map each ASCII-encoded base-62 character to its binary value.
+    // Map each ASCII-encoded Base62 character to its binary value.
     for c in encoded.iter_mut() {
         if *c & 0x80 != 0 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Non-ASCII character in input"));
@@ -136,8 +136,8 @@ mod tests {
 
         for (in_base, out_base, input) in suite {
             println!("input: {}", big_int(input.as_ref()));
-            let mut intermediate = vec![0; 20];
-            let mut output = vec![0; 20];
+            let mut intermediate = vec![0; conversion_len_bound(input.len(), in_base, out_base)];
+            let mut output = vec![0; input.len()];
 
             change_base(input.clone().as_mut_slice(), intermediate.as_mut(), in_base, out_base);
             println!("intermediate: {}", big_int(intermediate.as_ref()));

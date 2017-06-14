@@ -63,7 +63,7 @@ impl Ksuid {
         rand::random()
     }
 
-    /// Parse a `Ksuid` from a 27-byte, base62-encoded string.
+    /// Parse a `Ksuid` from a 27-byte, Base62-encoded string.
     pub fn from_base62(s: &str) -> io::Result<Self> {
         let bytes = s.as_bytes();
         if bytes.len() != BASE62_LEN || bytes > MAX_BASE62_KSUID {
@@ -126,7 +126,7 @@ impl Ksuid {
         ret
     }
 
-    /// The base62-encoded version of this `Ksuid`.
+    /// The Base62-encoded version of this `Ksuid`.
     pub fn to_base62(&self) -> String {
         let mut scratch = self.0;
         let mut out = vec![0; 27];
