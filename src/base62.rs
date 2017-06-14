@@ -149,35 +149,27 @@ mod tests {
     }
 
     #[bench]
-    fn bench_change_base(b: &mut test::Bencher) {
-        let mut out = vec![0; 20];
+    fn bench_change_base_to_62(b: &mut test::Bencher) {
+        let mut out = vec![0; 27];
         b.iter(|| {
             test::black_box(&mut out);
-            let mut bytes = [12, 104, 48, 1, 245, 234, 245, 14, 194];
+            let mut bytes = [255; 20];
             change_base(bytes.as_mut(), out.as_mut(), 256, 62);
         })
     }
 
     #[bench]
-    fn bench_encode(b: &mut test::Bencher) {
-        // This KSUID has a leading zero. Therefore we use a 26-byte buffer so we don't have to
-        // zero the output after every run.
-        let mut out = vec![0; 26];
-        let hex = data_encoding::hex::decode(b"05A95E21D7B6FE8CD7CFF211704D8E7B9421210B").unwrap();
-        b.iter(|| {
-            test::black_box(&mut out);
-            encode_raw(hex.clone().as_mut(), out.as_mut());
-        })
-    }
-
-    #[bench]
-    fn bench_decode(b: &mut test::Bencher) {
+    fn bench_change_base_from_62(b: &mut test::Bencher) {
         let mut out = vec![0; 20];
-        let encoded = *array_ref!(b"0o5Fs0EELR0fUjHjbCnEtdUwQe3", 0, 27);
+        let mut bytes = vec![0; 27];
+        let mut max_id = [0xff; 20];
+        change_base(max_id.as_mut(), bytes.as_mut(), 256, 62);
 
+        // `bytes` now holds the maximum valid Base62 encoded ksuid.
         b.iter(|| {
             test::black_box(&mut out);
-            let _ = decode_raw(encoded.clone().as_mut(), out.as_mut());
+            let mut bytes = *array_ref![bytes.as_slice(), 0, 27];
+            change_base(bytes.as_mut(), out.as_mut(), 62, 256);
         })
     }
 }

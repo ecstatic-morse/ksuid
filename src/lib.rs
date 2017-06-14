@@ -203,7 +203,7 @@ mod tests {
 
     #[bench]
     fn bench_from_base62(b: &mut test::Bencher) {
-        let encoded = "0o5Fs0EELR0fUjHjbCnEtdUwQe3";
+        let encoded = ::std::str::from_utf8(MAX_BASE62_KSUID).unwrap();
 
         b.iter(|| {
             Ksuid::from_base62(encoded)
@@ -212,11 +212,25 @@ mod tests {
 
     #[bench]
     fn bench_to_base62(b: &mut test::Bencher) {
-        let hex = "05A95E21D7B6FE8CD7CFF211704D8E7B9421210B";
-        let ksuid = Ksuid::from_hex(hex).unwrap();
+        let ksuid = Ksuid::from_bytes(&[255; 20]).unwrap();
 
         b.iter(|| {
             ksuid.to_base62()
+        })
+    }
+
+    #[bench]
+    fn bench_gen(b: &mut test::Bencher) {
+        b.iter(|| {
+            Ksuid::generate()
+        })
+    }
+
+    #[bench]
+    fn bench_gen_lock_rng(b: &mut test::Bencher) {
+        let mut rng = rand::thread_rng();
+        b.iter(|| {
+            rng.gen::<Ksuid>()
         })
     }
 }
