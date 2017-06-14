@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate serde_derive;
+
 extern crate docopt;
 extern crate ksuid;
+extern crate rand;
 
-use std::io;
+use std::io::{self, Write};
 
 use ksuid::Ksuid;
+use rand::Rng;
 
 const USAGE: &str = "
 ksuid
@@ -38,8 +41,13 @@ fn main() {
 }
 
 fn generate(args: Args) {
+    let out = io::stdout();
+    let mut locked = out.lock();
+
+    let mut rng = rand::thread_rng();
+
     for _ in 0..args.flag_count {
-        println!("{}", Ksuid::generate().to_base62());
+        write!(&mut locked, "{}", rng.gen::<Ksuid>().to_base62()).unwrap();
     }
 }
 
