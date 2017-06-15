@@ -1,6 +1,7 @@
 MIT License
 
 Copyright for the ksuid reference implementation (c) 2017 Segment.io
+
 Copyright for this project (c) 2017 Dylan MacKenzie
 
 Permission is hereby granted, free of charge, to any person obtaining a
