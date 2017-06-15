@@ -169,17 +169,21 @@ impl Ksuid {
         let mut scratch = self.0;
         let mut out = vec![0; 27];
         base62::encode_raw(scratch.as_mut(), out.as_mut());
+
+        // This is valid because base 62 encoded data contains only ASCII alphanumeric characters.
         unsafe { String::from_utf8_unchecked(out) }
     }
 
     /// The hex-encoded version of this identifier.
     pub fn to_hex(&self) -> String {
-        let mut ret = String::with_capacity(40);
+        let mut ret = Vec::with_capacity(40);
         for b in self.as_bytes() {
-            ret.push(HEX_DIGITS[(b / 16) as usize] as char);
-            ret.push(HEX_DIGITS[(b % 16) as usize] as char);
+            ret.push(HEX_DIGITS[(b / 16) as usize]);
+            ret.push(HEX_DIGITS[(b % 16) as usize]);
         }
-        ret
+
+        // This is valid because we push only ASCII characters from `HEX_DIGITS` into `ret`.
+        unsafe { String::from_utf8_unchecked(ret) }
     }
 
     /// The 20-byte binary representation of this identifier.
