@@ -49,10 +49,15 @@ pub fn conversion_len_bound(len: usize, in_base: usize, out_base: usize) -> usiz
 /// Change the base of a byte string representing a big-endian encoded arbitrary-size unsigned
 /// integer.
 ///
-/// `out` must be zeroed by the caller prior to invoking this function, as `change_base()` does not
-/// explicitly clear the leading zeros of the result in the output buffer.
+/// The result of the change of base will be written to the out buffer in big-endian order (the
+/// least significant byte at buf.last()).
+///
+/// `out` should be zeroed by the caller prior to invoking this function, as `change_base()` does
+/// not always need the whole output buffer to encode the result. When the buffer is zeroed, the
+/// untouched bytes become leading zeros of the resulting integer.
 fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) {
     debug_assert!(out.iter().all(|&b| b == 0));
+
     let mut k = out.len();
 
     // Use grade-school long division, storing the intermediate result back into `num` as we go.
@@ -76,13 +81,6 @@ fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usi
         out[k] = rem as u8;
         num.resize_to(i);
     }
-
-    // Explicitly clearing leading zeros significantly hurts performance.
-    /*
-    for i in 0..k {
-        out[i] = 0;
-    }
-    */
 }
 
 /// Base62-encode `input`, placing the result into `output`.
@@ -151,6 +149,9 @@ mod tests {
             assert_eq!(input, output.split_at(first_nonzero).1);
         }
     }
+
+    // These benchmarks don't zero the out buffer between runs to better isolate the performance of
+    // the function under test.
 
     #[bench]
     fn bench_change_base_to_62(b: &mut test::Bencher) {
