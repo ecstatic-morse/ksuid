@@ -3,6 +3,7 @@ extern crate serde_derive;
 
 extern crate docopt;
 extern crate ksuid;
+extern crate time;
 extern crate rand;
 
 use std::io::{self, Write};
@@ -77,7 +78,7 @@ COMPONENTS:
 "       ,
         ksuid.to_base62(),
         ksuid.to_hex(),
-        ksuid.time().rfc822(),
+        time::at(ksuid.time()).rfc822(),
         ksuid.timestamp(),
         ksuid.to_hex().chars().skip(8).collect::<String>());
     }
