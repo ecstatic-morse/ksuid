@@ -1,3 +1,17 @@
+//! Utilities for Base62 encoding of data.
+//!
+//! The public interface of this module is unusual in two ways:
+//!
+//! The `input` buffer is clobbered during encoding/decoding. This saves an allocation during the
+//! change of base routine, as we can resue the buffer to hold intermediate values during long
+//! division.
+//!
+//! The `output` buffer must be preallocated by the caller. If the caller fails to reserve enough
+//! space, the function will panic. This choice was made because binary and string encoded KSUIDs
+//! have known lengths, allowing us to avoid dynamically allocating the output buffer. For general
+//! purpose use, callers should use `conversion_len_bound()` to calculate the required output
+//! buffer length.
+
 use std::io;
 
 use resize_slice::ResizeSlice;
@@ -20,9 +34,9 @@ const BYTE_MAP: &[i8] = &[
 ///
 /// # Panics
 ///
-/// Panics if `c` is not in the ASCII range (`c > 127`)
+/// Panics if `c` is not in the 7-bit ASCII range (`c > 127`)
 fn b62_to_bin(c: u8) -> i8 {
-    // TODO: benchmark vs position() in CHAR_MAP
+    // Map lookup is faster than indexing CHAR_MAP.
     BYTE_MAP[c as usize]
 }
 
@@ -35,14 +49,9 @@ pub fn conversion_len_bound(len: usize, in_base: usize, out_base: usize) -> usiz
 /// Change the base of a byte string representing a big-endian encoded arbitrary-size unsigned
 /// integer.
 ///
-/// # Notes
-///
-/// This clobbers `num`.
-///
-/// `out `should be zeroed prior to being passed to this function, as this function will leave
-/// bytes in the output buffer corresponding to any leading zeros in the resulting number
-/// unchanged instead of explicitly overwriting them.
-pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) {
+/// `out` must be zeroed by the caller prior to invoking this function, as `change_base()` does not
+/// explicitly clear the leading zeros of the result in the output buffer.
+fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usize) {
     debug_assert!(out.iter().all(|&b| b == 0));
     let mut k = out.len();
 
@@ -76,24 +85,19 @@ pub fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base:
     */
 }
 
-/// Base62-encode `raw`, placing the result into `out`.
-///
-/// `raw` will be clobbered.
-pub fn encode_raw(raw: &mut [u8], out: &mut [u8]) {
-    change_base(raw, out, 256, 62);
-    for b in out.iter_mut() {
+/// Base62-encode `input`, placing the result into `output`.
+pub fn encode_raw(input: &mut [u8], output: &mut [u8]) {
+    change_base(input, output, 256, 62);
+    for b in output.iter_mut() {
         *b = CHAR_MAP[*b as usize];
     }
 }
 
-
-/// Base62-decode `encoded`, placing the result into `out`. If `encoded` contains any characters
-/// which are not matching `/[0-9A-Za-z]/`, an error will be returned.
-///
-/// `encoded` will be clobbered.
-pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
+/// Decode the Base62-encoded data in `input`, placing the result into `output`. If `input`
+/// contains any characters which do not match `/[0-9A-Za-z]/`, an error will be returned.
+pub fn decode_raw(input: &mut [u8], output: &mut [u8]) -> io::Result<()> {
     // Map each ASCII-encoded Base62 character to its binary value.
-    for c in encoded.iter_mut() {
+    for c in input.iter_mut() {
         if *c & 0x80 != 0 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Non-ASCII character in input"));
         }
@@ -106,7 +110,7 @@ pub fn decode_raw(encoded: &mut [u8], out: &mut [u8]) -> io::Result<()> {
         *c = b as u8;
     }
 
-    change_base(encoded, out, 62, 256);
+    change_base(input, output, 62, 256);
     Ok(())
 }
 

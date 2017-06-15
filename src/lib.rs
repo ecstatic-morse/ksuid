@@ -1,3 +1,17 @@
+//! KSUID stands for K-Sortable Unique IDentifier, a globally unique identifier created by
+//! [Segment](https://segment.com/blog/a-brief-history-of-the-uuid/).
+//!
+//! KSUIDs incorporate a timestamp with 1-second resolution which allows them to be (roughly)
+//! sorted chronologically, as well as a 128-bit random payload in the style of UUIDv4 which
+//! reduces the risk of collisions. They can be serialized using a Base62 encoding compatible with
+//! environments which only support alphanumeric data. The lexicographic ordering of both the
+//! binary and string representations preserves the chronological ordering of the embedded
+//! timestamp.
+//!
+//! See the [canonical implementation](https://github.com/segmentio/ksuid) for more information.
+//!
+//! The author of this package is not affiliated with Segment.
+
 #![feature(test)]
 
 extern crate byteorder;
@@ -14,7 +28,7 @@ use byteorder::{ByteOrder, BigEndian};
 use time::{Timespec, Tm, Duration};
 use rand::{Rng, Rand};
 
-pub const KSUID_EPOCH: Timespec = Timespec {sec: 1_400_000_000, nsec: 0};
+const KSUID_EPOCH: Timespec = Timespec {sec: 1_400_000_000, nsec: 0};
 
 const LEN: usize = 20;
 const EMPTY: [u8; LEN] = [0; LEN];
@@ -23,7 +37,7 @@ const HEX_LEN: usize = 40;
 const HEX_DIGITS: &[u8] = b"0123456789ABCDEF";
 const MAX_BASE62_KSUID: &[u8] = b"aWgEPTl1tmebfsQzFP4bxwgy80V";
 
-/// Get the numeric value corresponding to the given hex value.
+/// Get the numeric value corresponding to the given ASCII hex digit.
 fn hex_digit(c: u8) -> io::Result<u8> {
     HEX_DIGITS.iter()
         .position(|d| c.eq_ignore_ascii_case(d))
@@ -31,18 +45,25 @@ fn hex_digit(c: u8) -> io::Result<u8> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid hex character in input"))
 }
 
-/// A 20-byte UUID.
+/// A K-Sortable Unique IDentifier.
 ///
 /// The first 4 bytes are a big-endian encoded, unsigned timestamp indicating when the UUID was
-/// created. The timestamp is relative to a custom epoch which is defined to be 14e8 seconds after
-/// the UNIX epoch.
+/// created. The timestamp is relative to a custom epoch defined to be 14e8 seconds after the UNIX
+/// epoch.
 ///
-/// The remaining 16 bytes is a random payload, much like UUIDv4.
+/// The remaining 16 bytes is the randomly generated payload.
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Ksuid([u8; 20]);
 
 impl Ksuid {
-    /// Create a new `Ksuid` with the given timestamp and payload.
+    /// Create a new identifier with the given timestamp and payload.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let id = ksuid::Ksuid::new(1000, [0; 16]);
+    /// assert_eq!(id.timestamp(), 1000);
+    /// ```
     pub fn new(timestamp: u32, payload: [u8; 16]) -> Self {
         let mut ret = Ksuid(EMPTY);
         ret.set_timestamp(timestamp);
@@ -50,7 +71,7 @@ impl Ksuid {
         ret
     }
 
-    /// Create a new `Ksuid` with a current timestamp and the given payload.
+    /// Create a new identifier with a current timestamp and the given payload.
     pub fn with_payload(payload: [u8; 16]) -> Self {
         // TODO: check for overflow in timestamp
         let elapsed = time::get_time() - KSUID_EPOCH;
@@ -58,9 +79,9 @@ impl Ksuid {
         Self::new(ts, payload)
     }
 
-    /// Create a new `Ksuid` with a current timestamp and randomly generated payload.
+    /// Create a new identifier with a current timestamp and randomly generated payload.
     ///
-    /// This function uses the thread local random number generator. This means that if you're
+    /// This function uses the thread local random number generator. this means that if you're
     /// calling `generate()` in a loop, caching the generator can increase performance. See the
     /// documentation of [`rand::random()`](https://doc.rust-lang.org/rand/rand/fn.random.html) for
     /// an example.
@@ -68,7 +89,16 @@ impl Ksuid {
         rand::random()
     }
 
-    /// Parse a `Ksuid` from a 27-byte, Base62-encoded string.
+    /// Parse an identifier from its Base62-encoded string representation.
+    ///
+    /// `s` must be exactly 27 characters long.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let id = ksuid::Ksuid::from_base62("0o5Fs0EELR0fUjHjbCnEtdUwQe3").unwrap();
+    /// assert_eq!(id.timestamp(), 94985761);
+    /// ```
     pub fn from_base62(s: &str) -> io::Result<Self> {
         let bytes = s.as_bytes();
         if bytes.len() != BASE62_LEN || bytes > MAX_BASE62_KSUID {
@@ -82,10 +112,16 @@ impl Ksuid {
         Ok(ret)
     }
 
-    /// Parse a `Ksuid` from a valid hex-encoded string. All characters in `hex` must match
-    /// `/[0-9A-Fa-f]/`.
+    /// Parse an identifer from a string of hex characters (`/[0-9A-Fa-f]/`).
     ///
-    /// Once decoded, `hex` must be exactly 20 bytes long
+    /// `hex` must be exactly 40 characters long.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let id = ksuid::Ksuid::from_hex("05a95e21D7B6Fe8CD7Cff211704d8E7B9421210B").unwrap();
+    /// assert_eq!(id.timestamp(), 94985761);
+    /// ```
     pub fn from_hex(hex: &str) -> io::Result<Self> {
         if hex.len() != HEX_LEN {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Hex string must be 40 bytes long"));
@@ -102,7 +138,7 @@ impl Ksuid {
         Ok(ret)
     }
 
-    /// Parse a `Ksuid` from a raw slice.
+    /// Parse an identifier from its binary representation.
     ///
     /// `raw` must be exactly 20 bytes long.
     pub fn from_bytes(raw: &[u8]) -> io::Result<Self> {
@@ -115,7 +151,14 @@ impl Ksuid {
         Ok(ret)
     }
 
-    /// The Base62-encoded version of this `Ksuid`.
+    /// The Base62-encoded version of this identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let id = ksuid::Ksuid::new(::std::u32::MAX, [255; 16]);
+    /// assert_eq!(id.to_base62(), "aWgEPTl1tmebfsQzFP4bxwgy80V");
+    /// ```
     pub fn to_base62(&self) -> String {
         let mut scratch = self.0;
         let mut out = vec![0; 27];
@@ -123,7 +166,7 @@ impl Ksuid {
         unsafe { String::from_utf8_unchecked(out) }
     }
 
-    /// The hex-encoded version of this `Ksuid`.
+    /// The hex-encoded version of this identifier.
     pub fn to_hex(&self) -> String {
         let mut ret = String::with_capacity(40);
         for b in self.as_bytes() {
@@ -133,14 +176,12 @@ impl Ksuid {
         ret
     }
 
-    /// The binary representation of this `Ksuid`.
-    ///
-    /// This function does not allocate.
+    /// The 20-byte binary representation of this identifier.
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_ref()
     }
 
-    /// The number of seconds after the custom KSUID epoch when this id was created.
+    /// The timestamp embedded in the first four bytes of this identifier.
     pub fn timestamp(&self) -> u32 {
         BigEndian::read_u32(self.0.as_ref())
     }
@@ -168,12 +209,12 @@ impl Ksuid {
         KSUID_EPOCH + Duration::seconds(self.timestamp() as i64)
     }
 
-    /// The time at which this `Ksuid` was created, in the user's local time.
+    /// The time at which this `Ksuid` was created in the local timezone.
     pub fn time(&self) -> Tm {
         time::at(self.timespec())
     }
 
-    /// The time at which this `Ksuid` was created, normalized to UTC±00:00.
+    /// The time at which this `Ksuid` was created in UTC.
     pub fn time_utc(&self) -> Tm {
         time::at_utc(self.timespec())
     }
