@@ -28,7 +28,7 @@ use byteorder::{ByteOrder, BigEndian};
 use time::{Timespec, Duration};
 use rand::{Rng, Rand};
 
-/// The KSUID epoch, 14e8 seconds after the UNIX epoch.
+/// The KSUID epoch, 1.4 billion seconds after the UNIX epoch.
 ///
 /// ```
 /// # extern crate ksuid;
@@ -55,7 +55,8 @@ fn hex_digit(c: u8) -> io::Result<u8> {
 /// A K-Sortable Unique IDentifier.
 ///
 /// The first 4 bytes are a big-endian encoded, unsigned timestamp indicating when the UUID was
-/// created. The timestamp is relative to a custom epoch.
+/// created. The timestamp is relative to a custom epoch, exported from this crate as
+/// [`EPOCH`](constant.EPOCH.html).
 ///
 /// The remaining 16 bytes is the randomly generated payload.
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
@@ -192,6 +193,9 @@ impl Ksuid {
     }
 
     /// The 32-bit timestamp of this identifier.
+    ///
+    /// Most consumers should use [`Ksuid::time()`](struct.Ksuid.html#method.time) to extract
+    /// the creation date of an identifer.
     pub fn timestamp(&self) -> u32 {
         BigEndian::read_u32(self.0.as_ref())
     }
