@@ -249,6 +249,22 @@ mod tests {
     }
 
     #[bench]
+    fn bench_to_hex(b: &mut test::Bencher) {
+        let ksuid = Ksuid::from_bytes(&[255; 20]).unwrap();
+
+        b.iter(|| {
+            ksuid.to_hex()
+        })
+    }
+
+    #[bench]
+    fn bench_from_hex(b: &mut test::Bencher) {
+        b.iter(|| {
+            Ksuid::from_hex("ffffffffffffffffffffffffffffffffffffffff")
+        })
+    }
+
+    #[bench]
     fn bench_gen(b: &mut test::Bencher) {
         b.iter(|| {
             Ksuid::generate()
