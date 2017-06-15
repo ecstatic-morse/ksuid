@@ -61,7 +61,7 @@ fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usi
     let mut k = out.len();
 
     // Use grade-school long division, storing the intermediate result back into `num` as we go.
-    while num.len() > 0 {
+    while !num.is_empty() {
         let mut rem = 0;
         let mut i = 0;
 
@@ -77,7 +77,7 @@ fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usi
         }
 
         k -= 1;
-        *out.get_mut(k).expect("Input buffer not large enough") = rem as u8;
+        *out.get_mut(k).expect("Output buffer not large enough") = rem as u8;
         out[k] = rem as u8;
         num.resize_to(i);
     }
@@ -116,6 +116,9 @@ pub fn decode_raw(input: &mut [u8], output: &mut [u8]) -> io::Result<()> {
 mod tests {
     extern crate num;
     extern crate test;
+
+    use std::panic;
+
     use super::*;
 
     fn big_int(bytes: &[u8]) -> num::BigUint {
@@ -127,6 +130,24 @@ mod tests {
         assert_eq!(b62_to_bin(b'0'), 0);
         assert_eq!(b62_to_bin(b'A'), 10);
         assert_eq!(b62_to_bin(b'a'), 36);
+    }
+
+    #[test]
+    fn bounds() {
+        for i in 1..100 {
+            for &(ib, ob) in &[(62, 256), (256, 62)] {
+                let res = panic::catch_unwind(|| {
+                    let mut input = vec![(ib-1) as u8; i];
+                    let mut output = vec![0; conversion_len_bound(i, ib, ob)];
+                    change_base(input.as_mut(), output.as_mut(), ib, ob);
+                    output[0]
+                });
+
+                assert!(res.unwrap() != 0,
+                        "imperfect bound for converting [{}, {}] from base {} to base {}",
+                        ib-1, i, ib, ob);
+            }
+        }
     }
 
     #[test]
