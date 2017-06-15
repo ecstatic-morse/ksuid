@@ -3,6 +3,9 @@ authors = ["Dylan MacKenzie <ecstaticmorse@gmail.com>"]
 name = "ksuid"
 version = "0.1.0"
 
+keywords = ["uuid", "ksuid", "guid"]
+license = "MIT"
+
 [[bin]]
 doc = false
 name = "ksuid"
