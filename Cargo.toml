@@ -21,3 +21,8 @@ time = "0.1.37"
 
 [dev-dependencies]
 num = "0.1.39"
+
+[features]
+# Set on nightly to enable benchmarks
+# We use this instead of a benches/ directory so we can benchmark internal functions
+bench = []

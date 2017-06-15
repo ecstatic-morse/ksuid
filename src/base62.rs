@@ -41,6 +41,10 @@ fn b62_to_bin(c: u8) -> i8 {
 }
 
 /// An upper-bound on the length of the result of a generic base conversion.
+///
+/// This function is not used for serializing KSUIDs because their length is fixed, but is useful
+/// for testing.
+#[allow(dead_code)]
 pub fn conversion_len_bound(len: usize, in_base: usize, out_base: usize) -> usize {
     let out = len as f64 * ((in_base as f64).ln() / (out_base as f64).ln());
     out as usize + 1
@@ -115,9 +119,6 @@ pub fn decode_raw(input: &mut [u8], output: &mut [u8]) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     extern crate num;
-    extern crate test;
-
-    use std::panic;
 
     use super::*;
 
@@ -136,7 +137,7 @@ mod tests {
     fn bounds() {
         for i in 1..100 {
             for &(ib, ob) in &[(62, 256), (256, 62)] {
-                let res = panic::catch_unwind(|| {
+                let res = ::std::panic::catch_unwind(|| {
                     let mut input = vec![(ib-1) as u8; i];
                     let mut output = vec![0; conversion_len_bound(i, ib, ob)];
                     change_base(input.as_mut(), output.as_mut(), ib, ob);
@@ -169,6 +170,11 @@ mod tests {
             assert_eq!(input, output.split_at(first_nonzero).1);
         }
     }
+}
+
+#[cfg(feature = "bench")]
+mod bench {
+    extern crate test;
 
     // These benchmarks don't zero the out buffer between runs to better isolate the performance of
     // the function under test.
@@ -179,7 +185,7 @@ mod tests {
         b.iter(|| {
             test::black_box(&mut out);
             let mut bytes = [255; 20];
-            change_base(bytes.as_mut(), out.as_mut(), 256, 62);
+            super::change_base(bytes.as_mut(), out.as_mut(), 256, 62);
         })
     }
 
@@ -188,14 +194,14 @@ mod tests {
         let mut out = vec![0; 20];
         let mut bytes = vec![0; 27];
         let mut max_id = [0xff; 20];
-        change_base(max_id.as_mut(), bytes.as_mut(), 256, 62);
+        super::change_base(max_id.as_mut(), bytes.as_mut(), 256, 62);
 
         // `bytes` now holds the maximum valid Base62 encoded ksuid.
         b.iter(|| {
             test::black_box(&mut out);
             let mut scratch = [0; 27];
             scratch.copy_from_slice(bytes.as_ref());
-            change_base(scratch.as_mut(), out.as_mut(), 62, 256);
+            super::change_base(scratch.as_mut(), out.as_mut(), 62, 256);
         })
     }
 }

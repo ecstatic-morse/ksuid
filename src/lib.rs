@@ -11,7 +11,8 @@
 //!
 //! The author of this package is not affiliated with Segment.
 
-#![feature(test)]
+#![deny(missing_docs)]
+#![cfg_attr(feature = "bench", feature(test))]
 
 extern crate byteorder;
 extern crate rand;
@@ -232,9 +233,11 @@ impl Rand for Ksuid {
     }
 }
 
+#[cfg(feature = "bench")]
 #[cfg(test)]
 mod tests {
     extern crate test;
+
     use super::*;
 
     #[bench]
