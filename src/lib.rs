@@ -60,7 +60,7 @@ fn hex_digit(c: u8) -> io::Result<u8> {
 ///
 /// The remaining 16 bytes is the randomly generated payload.
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Ksuid([u8; 20]);
+pub struct Ksuid([u8; LEN]);
 
 impl Ksuid {
     /// Create a new identifier with the given timestamp and payload.
@@ -168,7 +168,7 @@ impl Ksuid {
     /// ```
     pub fn to_base62(&self) -> String {
         let mut scratch = self.0;
-        let mut out = vec![0; 27];
+        let mut out = vec![0; BASE62_LEN];
         base62::encode_raw(scratch.as_mut(), out.as_mut());
 
         // This is valid because base 62 encoded data contains only ASCII alphanumeric characters.
@@ -177,7 +177,7 @@ impl Ksuid {
 
     /// The hex-encoded version of this identifier.
     pub fn to_hex(&self) -> String {
-        let mut ret = Vec::with_capacity(40);
+        let mut ret = Vec::with_capacity(HEX_LEN);
         for b in self.as_bytes() {
             ret.push(HEX_DIGITS[(b / 16) as usize]);
             ret.push(HEX_DIGITS[(b % 16) as usize]);
@@ -249,7 +249,7 @@ mod tests {
 
     #[bench]
     fn bench_to_base62(b: &mut test::Bencher) {
-        let ksuid = Ksuid::from_bytes(&[255; 20]).unwrap();
+        let ksuid = Ksuid::from_bytes(&[255; LEN]).unwrap();
 
         b.iter(|| {
             ksuid.to_base62()
@@ -258,7 +258,7 @@ mod tests {
 
     #[bench]
     fn bench_to_hex(b: &mut test::Bencher) {
-        let ksuid = Ksuid::from_bytes(&[255; 20]).unwrap();
+        let ksuid = Ksuid::from_bytes(&[255; LEN]).unwrap();
 
         b.iter(|| {
             ksuid.to_hex()
