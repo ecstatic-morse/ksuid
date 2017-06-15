@@ -207,7 +207,7 @@ impl Ksuid {
 
     /// The number of seconds after the UNIX epoch when this identifier was created.
     pub fn time(&self) -> Timespec {
-        EPOCH + Duration::seconds(self.timestamp() as i64)
+        EPOCH + Duration::seconds(self.timestamp().into())
     }
 
     /// Set the timestamp of the identifier to the given time.

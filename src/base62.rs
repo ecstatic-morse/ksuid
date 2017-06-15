@@ -37,7 +37,7 @@ const BYTE_MAP: &[i8] = &[
 /// Panics if `c` is not in the 7-bit ASCII range (`c > 127`)
 fn b62_to_bin(c: u8) -> i8 {
     // Map lookup is faster than indexing CHAR_MAP.
-    BYTE_MAP[c as usize]
+    BYTE_MAP[usize::from(c)]
 }
 
 /// An upper-bound on the length of the result of a generic base conversion.
@@ -61,7 +61,7 @@ fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usi
         let mut i = 0;
 
         for j in 0..num.len() {
-            let acc = num[j] as usize + in_base * rem;
+            let acc = usize::from(num[j]) + in_base * rem;
             let div = acc / out_base;
             rem = acc % out_base;
 
@@ -89,7 +89,7 @@ fn change_base(mut num: &mut [u8], out: &mut [u8], in_base: usize, out_base: usi
 pub fn encode_raw(input: &mut [u8], output: &mut [u8]) {
     change_base(input, output, 256, 62);
     for b in output.iter_mut() {
-        *b = CHAR_MAP[*b as usize];
+        *b = CHAR_MAP[usize::from(*b)];
     }
 }
 
@@ -103,7 +103,7 @@ pub fn decode_raw(input: &mut [u8], output: &mut [u8]) -> io::Result<()> {
         }
 
         let b = b62_to_bin(*c);
-        if b == -1 {
+        if b < 0 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid base62 character in input"));
         }
 
