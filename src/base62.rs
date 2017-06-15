@@ -115,7 +115,6 @@ pub fn decode_raw(input: &mut [u8], output: &mut [u8]) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     extern crate num;
-    extern crate data_encoding;
     extern crate test;
     use super::*;
 
