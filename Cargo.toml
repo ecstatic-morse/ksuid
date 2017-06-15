@@ -8,17 +8,10 @@ readme = "README.md"
 keywords = ["uuid", "ksuid", "guid"]
 license = "MIT"
 
-[[bin]]
-doc = false
-name = "ksuid"
-
 [dependencies]
 byteorder = "1.0.0"
-docopt = "0.8.0"
 rand = "0.3.15"
 resize-slice = "0.1.2"
-serde = "1.0.8"
-serde_derive = "1.0.8"
 time = "0.1.37"
 
 [dev-dependencies]
@@ -28,3 +21,6 @@ num = "0.1.39"
 # Set on nightly to enable benchmarks
 # We use this instead of a benches/ directory so we can benchmark internal functions
 bench = []
+
+[workspace]
+members = ["cli"]

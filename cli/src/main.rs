@@ -48,7 +48,7 @@ fn generate(args: Args) {
     let mut rng = rand::thread_rng();
 
     for _ in 0..args.flag_count {
-        write!(&mut locked, "{}", rng.gen::<Ksuid>().to_base62()).unwrap();
+        writeln!(&mut locked, "{}", rng.gen::<Ksuid>().to_base62()).unwrap();
     }
 }
 
