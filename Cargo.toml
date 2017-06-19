@@ -2,7 +2,7 @@
 authors = ["Dylan MacKenzie <ecstaticmorse@gmail.com>"]
 name = "ksuid"
 version = "0.1.0"
-description = "A small utility for dealing with Segment.io KSUIDs"
+description = "A library for efficiently generating, parsing and serializing Segment.io KSUIDs"
 repository = "https://github.com/ecstatic-morse/ksuid.git"
 readme = "README.md"
 keywords = ["uuid", "ksuid", "guid"]

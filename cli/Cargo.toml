@@ -1,7 +1,12 @@
 [package]
+authors = ["Dylan MacKenzie <ecstaticmorse.gmail.com>"]
 name = "ksuid-cli"
 version = "0.1.0"
-authors = ["Dylan MacKenzie <ecstaticmorse.gmail.com>"]
+description = "A command line interface for generating, parsing, and serializing Segment.io KSUIDs"
+repository = "https://github.com/ecstatic-morse/ksuid.git"
+readme = "../README.md"
+keywords = ["uuid", "ksuid", "guid"]
+license = "MIT"
 
 [dependencies]
 docopt = "0.8.0"
