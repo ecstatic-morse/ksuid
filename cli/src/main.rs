@@ -7,6 +7,7 @@ extern crate time;
 extern crate rand;
 
 use std::io::{self, Write};
+use std::process::exit;
 
 use ksuid::Ksuid;
 use rand::Rng;
@@ -59,10 +60,16 @@ fn inspect(args: Args) {
         } else if uid.len() == 27 {
             Ksuid::from_base62(uid.as_ref())
         } else {
-            Err(io::Error::new(io::ErrorKind::InvalidData, ""))
+            Err(io::Error::new(io::ErrorKind::InvalidData, "KSUID must be either 27 characters (Base62) or 40 characters (Hex) in length"))
         };
 
-        let ksuid = res.expect("Invalid KSUID");
+        let ksuid = match res {
+            Ok(id) => id,
+            Err(e) => {
+                let _ = writeln!(io::stderr(), "Invalid KSUID: {}", e);
+                exit(e.raw_os_error().unwrap_or(2));
+            }
+        };
 
         println!("
 REPRESENTATION:
