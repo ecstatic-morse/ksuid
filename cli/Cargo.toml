@@ -8,8 +8,12 @@ readme = "../README.md"
 keywords = ["uuid", "ksuid", "guid"]
 license = "MIT"
 
+[[bin]]
+name = "ksuid"
+path = "src/main.rs"
+
 [dependencies]
-docopt = "0.8.0"
+docopt = "1.0.0"
 ksuid = { version="0.1.0", path = ".." }
 rand = "0.3.15"
 serde = "1.0.8"
