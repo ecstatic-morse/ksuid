@@ -16,11 +16,13 @@ const USAGE: &str = "
 ksuid
 
 Usage:
-    ksuid [--count=<n>]
+    ksuid [-n <n> | --count=<n>]
     ksuid inspect <uids>...
+    ksuid -h | --help
 
 Options:
-    -n=<n>, --count=<n>  Number of KSUIDs to generate [default: 1]
+    -h, --help           Display this help and exit
+    -n <n>, --count=<n>  Number of KSUIDs to generate [default: 1]
 ";
 
 #[derive(Debug, Deserialize)]
