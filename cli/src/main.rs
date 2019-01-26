@@ -1,14 +1,15 @@
 #[macro_use]
 extern crate serde_derive;
 
+extern crate chrono;
 extern crate docopt;
 extern crate ksuid;
-extern crate time;
 extern crate rand;
 
 use std::io::{self, Write};
 use std::process::exit;
 
+use chrono::prelude::*;
 use ksuid::Ksuid;
 use rand::Rng;
 
@@ -85,7 +86,7 @@ COMPONENTS:
 "       ,
         ksuid.to_base62(),
         ksuid.to_hex(),
-        time::at(ksuid.time()).rfc822(),
+        DateTime::<Local>::from(ksuid.time()).to_rfc2822(),
         ksuid.timestamp(),
         ksuid.to_hex().chars().skip(8).collect::<String>());
     }

@@ -17,25 +17,15 @@
 extern crate byteorder;
 extern crate rand;
 extern crate resize_slice;
-extern crate time;
 
 mod base62;
 
 use std::io;
 use std::ascii::AsciiExt;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use byteorder::{ByteOrder, BigEndian};
-use time::{Timespec, Duration};
 use rand::{Rng, Rand};
-
-/// The KSUID epoch, 1.4 billion seconds after the UNIX epoch.
-///
-/// ```
-/// # extern crate ksuid;
-/// # extern crate time;
-/// assert_eq!(ksuid::EPOCH, time::strptime("2014-5-13 16:53:20", "%Y-%m-%d %T").unwrap().to_timespec());
-/// ```
-pub const EPOCH: Timespec = Timespec {sec: 1_400_000_000, nsec: 0};
 
 const LEN: usize = 20;
 const EMPTY: [u8; LEN] = [0; LEN];
@@ -43,6 +33,7 @@ const BASE62_LEN: usize = 27;
 const HEX_LEN: usize = 40;
 const HEX_DIGITS: &[u8] = b"0123456789ABCDEF";
 const MAX_BASE62_KSUID: &[u8] = b"aWgEPTl1tmebfsQzFP4bxwgy80V";
+const MAX_U32: u64 = u32::max_value() as u64;
 
 /// Get the numeric value corresponding to the given ASCII hex digit.
 fn hex_digit(c: u8) -> io::Result<u8> {
@@ -56,13 +47,19 @@ fn hex_digit(c: u8) -> io::Result<u8> {
 ///
 /// The first 4 bytes are a big-endian encoded, unsigned timestamp indicating when the UUID was
 /// created. The timestamp is relative to a custom epoch, exported from this crate as
-/// [`EPOCH`](constant.EPOCH.html).
+/// [`Ksuid::epoch()`](struct.Ksuid.html#method.epoch).
 ///
 /// The remaining 16 bytes is the randomly generated payload.
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Ksuid([u8; LEN]);
 
 impl Ksuid {
+    /// The KSUID epoch, 1.4 billion seconds after the UNIX epoch.
+    pub  fn epoch() -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(1_400_000_000)
+    }
+
+
     /// Create a new identifier with the given timestamp and payload.
     ///
     /// # Examples
@@ -81,10 +78,10 @@ impl Ksuid {
 
     /// Create a new identifier with a current timestamp and the given payload.
     pub fn with_payload(payload: [u8; 16]) -> Self {
-        // TODO: check for overflow in timestamp
-        let elapsed = time::get_time() - EPOCH;
-        let ts = elapsed.num_seconds() as u32;
-        Self::new(ts, payload)
+        let mut ret = Ksuid(EMPTY);
+        ret.set_time(SystemTime::now());
+        ret.set_payload(payload);
+        ret
     }
 
     /// Create a new identifier with a current timestamp and randomly generated payload.
@@ -205,15 +202,18 @@ impl Ksuid {
         BigEndian::write_u32(self.0.as_mut(), timestamp);
     }
 
-    /// The number of seconds after the UNIX epoch when this identifier was created.
-    pub fn time(&self) -> Timespec {
-        EPOCH + Duration::seconds(self.timestamp().into())
+    /// The time when this identifier was created.
+    pub fn time(&self) -> SystemTime {
+        Self::epoch() + Duration::from_secs(self.timestamp().into())
     }
 
     /// Set the timestamp of the identifier to the given time.
-    pub fn set_time(&mut self, time: Timespec) {
-        let dur = time - EPOCH;
-        self.set_timestamp(dur.num_seconds() as u32);
+    pub fn set_time(&mut self, time: SystemTime) {
+        let dur = time.duration_since(Self::epoch()).expect("time before KSUID epoch").as_secs();
+        if dur > MAX_U32 {
+            panic!("Seconds since EPOCH overflows u32");
+        }
+        self.set_timestamp(dur as u32);
     }
 
     /// The 16-byte random payload.
