@@ -22,7 +22,6 @@ extern crate time;
 mod base62;
 
 use std::io;
-use std::ascii::AsciiExt;
 
 use byteorder::{ByteOrder, BigEndian};
 use time::{Timespec, Duration};
