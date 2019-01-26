@@ -26,7 +26,8 @@ use std::ascii::AsciiExt;
 
 use byteorder::{ByteOrder, BigEndian};
 use time::{Timespec, Duration};
-use rand::{Rng, Rand};
+use rand::Rng;
+use rand::distributions::{Distribution, Standard};
 
 /// The KSUID epoch, 1.4 billion seconds after the UNIX epoch.
 ///
@@ -91,8 +92,7 @@ impl Ksuid {
     ///
     /// This function uses the thread local random number generator. this means that if you're
     /// calling `generate()` in a loop, caching the generator can increase performance. See the
-    /// documentation of [`rand::random()`](https://doc.rust-lang.org/rand/rand/fn.random.html) for
-    /// an example.
+    /// documentation of [`rand::random()`](rand::random) for an example.
     pub fn generate() -> Self {
         rand::random()
     }
@@ -227,9 +227,9 @@ impl Ksuid {
     }
 }
 
-impl Rand for Ksuid {
-    fn rand<R: Rng>(rng: &mut R) -> Self {
-        Self::with_payload(rng.gen())
+impl Distribution<Ksuid> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Ksuid {
+        Ksuid::with_payload(rng.gen())
     }
 }
 
